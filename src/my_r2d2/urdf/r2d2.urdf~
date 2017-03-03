@@ -1,0 +1,127 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="R2D2">>
+<xacro:property name="width" value=".2" />
+<xacro:property name="bodylen" value=".6" />
+<link name="base_link">
+    <visual>
+        <geometry>
+            <cylinder radius="${width}" length="${bodylen}"/>
+        </geometry>
+        <material name="blue">
+            <color rgba="0 0 .8 1"/>
+        </material>
+    </visual>
+    <collision>
+        <geometry>
+            <cylinder radius="${width}" length="${bodylen}"/>
+        </geometry>
+    </collision>
+</link>
+    <inertial>
+      <mass value="10"/>
+      <inertia ixx="0.4" ixy="0.0" ixz="0.0" iyy="0.4" iyz="0.0" izz="0.2"/>
+    </inertial>
+  </link>
+
+  <link name="right_leg">
+    <visual>
+      <geometry>
+        <box size="0.6 .2 .1"/>
+      </geometry>
+      <origin rpy="0 1.57075 0" xyz="0 0 -0.3"/>
+      <material name="white">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <joint name="base_to_right_leg" type="fixed">
+    <parent link="base_link"/>
+    <child link="right_leg"/>
+    <origin xyz="0.22 0 .25"/>
+  </joint>
+
+  <link name="left_leg">
+    <visual>
+      <geometry>
+        <box size="0.6 .2 .1"/>
+      </geometry>
+      <origin rpy="0 1.57075 0" xyz="0 0 -0.3"/>
+      <material name="white"/>
+    </visual>
+  </link>
+
+  <joint name="base_to_left_leg" type="fixed">
+    <parent link="base_link"/>
+    <child link="left_leg"/>
+    <origin xyz="-0.22 0 .25"/>
+  </joint>
+
+  <link name="head">
+    <visual>
+      <geometry>
+        <sphere radius="0.2"/>
+      </geometry>
+      <material name="white"/>
+    </visual>
+  </link>
+
+  <joint name="head_swivel" type="continuous">
+    <parent link="base_link"/>
+    <child link="head"/>
+    <axis xyz="0 0 1"/>
+    <origin xyz="0 0 0.3"/>
+  </joint>
+
+   <link name="left_gripper">
+    <visual>
+      <geometry>
+        <mesh filename="package://pr2_description/meshes/gripper_v0/l_finger.dae"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <link name="right_gripper">
+    <visual>
+      <geometry>
+        <mesh filename="package://pr2_description/meshes/gripper_v0/l_finger.dae"/>
+      </geometry>
+      <origin rpy="3 0 0"/>
+    </visual>
+  </link>
+
+  <joint name="left_gripper_joint" type="revolute">
+    <axis xyz="0 0 1"/>
+    <limit effort="1000.0" lower="0.0" upper="0.548" velocity="0.5"/>
+    <origin rpy="0 0 0" xyz="0.2 0.01 0"/>
+    <parent link="gripper_pole"/>
+    <child link="left_gripper"/>
+  </joint>
+
+  <joint name="right_gripper_joint" type="revolute">
+    <axis xyz="0 0 1"/>
+    <limit effort="1000.0" lower="0.0" upper="-0.548" velocity="0.5"/>
+    <origin rpy="0 0 0" xyz="0.2 0.01 0"/>
+    <parent link="gripper_pole"/>
+    <child link="right_gripper"/>
+  </joint>
+
+  <link name="gripper_pole">
+    <visual>
+      <geometry>
+        <cylinder length="0.45" radius="0.03"/>
+      </geometry>
+      <origin rpy="0 1.6 0"/>
+      <material name="white">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <joint name="gripper_extension" type="prismatic">
+    <parent link="base_link"/>
+    <child link="gripper_pole"/>
+    <limit effort="1000.0" lower="-0.38" upper="0" velocity="0.5"/>
+    <origin rpy="0 0 1.57075" xyz="0 0.19 .2"/>
+  </joint>
+</robot>
