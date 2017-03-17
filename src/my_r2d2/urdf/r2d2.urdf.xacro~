@@ -242,7 +242,15 @@
   <joint name="base_footprint_link" type="fixed">
     <parent link="base_footprint"/>
     <child link="base_link"/>
-    <origin xyz="0 0 ${wheeldiam + baselen/2 + .1}"/>
+    <origin xyz="0 0 ${wheeldiam + bodylen/2 + .1}"/>
   </joint>
+  
+  <link name="eye">
+  </link>
 
+  <joint name="box_eye_link" type="fixed">
+    <parent link="box"/>
+    <child link="eye"/>
+    <origin rpy="0 ${pi/2} 0"/>
+  </joint>
 </robot>
