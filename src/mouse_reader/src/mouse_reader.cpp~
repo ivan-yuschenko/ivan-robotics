@@ -82,7 +82,7 @@ int Mouse::findMouse()
  *  @param device_path file name of a linux event.
  *  @return file descriptor if open and other checks have been succesfully passed; -1 otherwise.
  */
-int Keyboard::openKeyboard( const char *device_path )
+int Mouse::openMouse( const char *device_path )
 {
   printf("Opening device: %s \n", device_path);
   int fd = open(device_path, O_RDONLY);				// file descriptor to the opened device
@@ -127,7 +127,7 @@ int Keyboard::openKeyboard( const char *device_path )
 
 
 /** Closes the device specificed by descriptor_. */
-void Keyboard::closeKeyboard()
+void Mouse::closeMouse()
 {
   printf("Closing keyboard device.\n");
   close(descriptor_);
@@ -138,7 +138,7 @@ void Keyboard::closeKeyboard()
 /** Checks if the keyboard event file has been succesfully opened.
  *  @return TRUE when descriptor_ is not negative, FALSE otherwise.
  */
-bool Keyboard::isReadable ()
+bool Mouse::isReadable ()
 {
   if (descriptor_ < 0) return false;
   return true;
@@ -149,7 +149,7 @@ bool Keyboard::isReadable ()
  *  @param ev input event.
  *  @return vector containing two unsigned integers: event code (based on linux/input.h) and event value (1 for pressed, 0 for depressed); returns {0, 0} if no EV_KEY.
  */
-std::vector <uint16_t> Keyboard::processEvent(struct input_event *ev)
+std::vector <uint16_t> Mouse::processEvent(struct input_event *ev)
 {
 
   std::vector <uint16_t> event;			// output vector
@@ -188,7 +188,7 @@ std::vector <uint16_t> Keyboard::processEvent(struct input_event *ev)
  *  @param fd file descriptor for keyboard event file.
  *  @return vector containing two unsigned integers: event code (based on linux/input.h) and event value (1 for pressed, 0 for depressed).
  */
-std::vector <uint16_t> Keyboard::getKeyEvent()
+std::vector <uint16_t> Mouse::getKeyEvent()
 {
   int const BUFFER_SIZE = 64;
   struct input_event ibuffer[BUFFER_SIZE];				// see: https://www.kernel.org/doc/Documentation/input/input.txt
@@ -220,7 +220,7 @@ std::vector <uint16_t> Keyboard::getKeyEvent()
  *  @param key_code uint corresponding to key on a keyboard
  *  @return string corresponding to a key code
  */
-std::string Keyboard::getKeyName(uint16_t key_code)
+std::string Mouse::getKeyName(uint16_t key_code)
 {
     return keymap_[key_code];
 }

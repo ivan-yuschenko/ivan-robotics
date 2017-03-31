@@ -26,116 +26,118 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-/** @file keyboard_reader.cpp
+/** @file griffin_powermate.h
+ *  On /griffin_powermate/events topic it publishes griffin_powermate::PowermateEvent
+ *  messages that contain direction and integral of the turn wheel as well as the 
+ *  information about push button being pressed or depressed.
+ * 
+ *  NOTE
+ *  If you get permission denied when running this ROS node, use
+ * 	ls -l /dev/input/event*
+ *  to learn which group can access linux input events. Then add your username to
+ *  that group by issuing
+ *  	sudo usermod -a -G [group_name] [user_name]
+ *  You need to log out and back in for these changes to take effect.
  * 
  *  @author karl.kruusamae(at)utexas.edu
- * 
- *  NOTE: If you get permission denied when starting this node. Use ' ls -l /dev/input/event* ' to learn which group can access the events.
- *        Then add your username to this group with ' sudo usermod -a -G group_name user_name '
  */
 
 #include "mouse_reader/mouse_reader.h"
 
-
-/** Goes through all the event files in /dev/input/ to locate keyboard.
- *  @return file descriptor if all checks out; -1 otherwise.
+/** Opens the input device and checks whether its meaningful name (ie, EVIOCGNAME in ioctl()) is listed in valid_substrings_.
+ *  @param device_path file name for linux event.
+ *  @return file descriptor to PowerMate event if all checks out, otherwise -1.
  */
-int Mouse::findMouse()
-{
-  int i, r;
-
-  // using glob() [see: http://linux.die.net/man/3/glob ] for getting event files in /dev/input/
-  glob_t gl;
-  int num_event_dev = 0;					// number of relevant event files found in /dev/input/
-  if(glob("/dev/input/", 0, NULL, &gl) == 0)		// looks for filenames that match the given pattern
-  {
-    num_event_dev = gl.gl_pathc;				// get the number of matching event files
-  }
-  
-  printf("\x1b[1;32mHere is the list of likely candiates for your keyboard. This function always starts with the \x1b[4mfirst one on the list.\x1b[0m ");
-  printf("\x1b[1;33mIf nothing happens when you press keyboard keys, terminate this process and re-start with user-specified device.\n\x1b[0m");
-  
-  // print all the paths that were found by glob()
-  for(i=0; i<num_event_dev; i++)
-  {
-    printf("[%d] %s \n",i, gl.gl_pathv[i]);
-  }
-  
-  // try to open every path found by glob
-  for(i=0; i<num_event_dev; i++)				// go through all relevant event files
-  {
-    r = openKeyboard(gl.gl_pathv[i]);				// try to open an event file
-    if(r >= 0)							// if openKeyboard was succesful
-    {
-      globfree(&gl);						// free memory allocated for globe struct
-      return r;							// return descriptor
-    } // if
-  } // for
-
-  globfree(&gl);						// free memory allocated for globe struct
-
-  return -1;							// return error -1 otherwise
-} // end find_keyboard
-
-
-/** Opens the input device and checks whether its meaningful name (ie, EVIOCGNAME in ioctl()) contains substrings specified in valid_substring.
- *  @param device_path file name of a linux event.
- *  @return file descriptor if open and other checks have been succesfully passed; -1 otherwise.
- */
-int Mouse::openMouse( const char *device_path )
+int Mouse::openMouse(const char *device_path)
 {
   printf("Opening device: %s \n", device_path);
-  int fd = open(device_path, O_RDONLY);				// file descriptor to the opened device
-
-  // if failed to open device_path
+  
+  // Open device at device_path for READONLY and get file descriptor 
+  int fd = open(device_path, O_RDONLY);
+  
+  // If failed to open device at device_path
   if(fd < 0)
   {
-    fprintf(stderr, "Unable to open \"%s\": %s\n", device_path, strerror(errno));
+    ROS_ERROR("Failed to open \"%s\"\n", device_path);
     return -1;
   }
 
-  /* NOTE: If your keyboard does not have substring specified in valid_substring in its EVIOCNAME, uncomment following line */
-//   return fd;
-
-  // Following is a fail-safe to avoid opening non-keyboard event by checking if the input device_path has valid_substring in its name.
-  char name[255];						// meaningful, ie EVIOCGNAME name
-  if( ioctl(fd, EVIOCGNAME( sizeof(name) ), name ) < 0) 	// fetches the meaningful (ie. EVIOCGNAME) name of the device desribed by descriptor fd
+  // Meaningful, i.e., EVIOCGNAME name
+  char name[255];
+  // Fetch the meaningful (i.e., EVIOCGNAME) name
+  if(ioctl(fd, EVIOCGNAME(sizeof(name)), name) < 0)
   {
-    fprintf(stderr, "\"%s\": EVIOCGNAME failed: %s\n", device_path, strerror(errno));
+    ROS_ERROR("\"%s\": EVIOCGNAME failed.", device_path);
     close(fd);
-    return -1;							// returns -1 if unable to fetch meaningful name
+    // Returns -1 if failed to fetch the meaningful name
+    return -1;
   }
-  
+
+  // Let's check if the meaningful name matches one listed in valid_substrings_
   std::ostringstream sstream;
-  sstream << name;						// convert char* to stringstream
-  std::string name_as_string = sstream.str();			// stringstream to string
+  // Convert name given as char* to stringstream
+  sstream << name;
+  // stringstream to string
+  std::string name_as_string = sstream.str();
   int i;
-  for (i=0; i < valid_substrings.size(); i++)
+  for (i=0; i < valid_substrings_.size(); i++)
   {
-    std::size_t found = name_as_string.find( valid_substrings[i] );// does the meaningful name contain a predefined valid substring
+    // Does the meaningful name contain a predefined valid substring?
+    std::size_t found = name_as_string.find( valid_substrings_[i] );
     if (found!=std::string::npos)
     {
-      printf("Found \x1b[1;34m'%s'\x1b[0m device. Starting to read ...\n", name);
-      return fd;						// if everything checks out, returns the file descriptor
+      // if everything checks out, print on screen and return the file descriptor
+      ROS_INFO("Found \x1b[1;34m'%s'\x1b[0m device. Starting to read ...\n", name);
+      return fd;
     } // end if
   } // end for
-
-  printf("%s does not seem to be a keyboard.\n", device_path);
+  
   close(fd);
   return -1;
-} // end openKeyboard
+} // end openPowerMate
 
+/** Goes through all the event files in /dev/input/ to locate Griffin PowerMate USB.
+ *  @return file descriptor if all checks out, otherwise -1.
+ */
+int Mouse::findMouse()
+{
+  // Using glob() [see: http://linux.die.net/man/3/glob ] for getting event files in /dev/input/
+  glob_t gl;
+  // Number of event files found in /dev/input/
+  int num_event_dev = 0;
+  // Counts for filenames that match the given pattern
+  if(glob("/dev/input/event*", GLOB_NOSORT, NULL, &gl) == 0)
+  {
+    // Get number of event files
+    num_event_dev = gl.gl_pathc;
+  }
+
+  int i, r;
+  // Goes through all the found event files
+  for(i = 0; i < num_event_dev; i++)
+  {
+    // Tries to open an event file as a PowerMate device
+    r = openMouse(gl.gl_pathv[i]);
+    // If opened file is PowerMate event, return file descriptor
+    if(r >= 0) return r;
+  } // for
+  
+  // free memory allocated for globe struct
+  globfree(&gl);
+
+  // return error -1 because no PowerMate device was found
+  return -1;
+} // end findPowerMate
 
 /** Closes the device specificed by descriptor_. */
 void Mouse::closeMouse()
 {
-  printf("Closing keyboard device.\n");
+  printf("Closing Mouse device.\n");
   close(descriptor_);
   return;
 }
 
-
-/** Checks if the keyboard event file has been succesfully opened.
+/** Checks if the PowerMate event file has been succesfully opened.
  *  @return TRUE when descriptor_ is not negative, FALSE otherwise.
  */
 bool Mouse::isReadable ()
@@ -144,83 +146,154 @@ bool Mouse::isReadable ()
   return true;
 }
 
-
-/** Searches the input event for type EV_KEY and returns event code (ie, which key) and value (ie, pressed or depressed).
+/** Processes the event data and publishes it as PowermateEvent message.
  *  @param ev input event.
- *  @return vector containing two unsigned integers: event code (based on linux/input.h) and event value (1 for pressed, 0 for depressed); returns {0, 0} if no EV_KEY.
+ *  @param ros_publisher ROS publisher.
  */
-std::vector <uint16_t> Mouse::processEvent(struct input_event *ev)
+void Mouse::processEvent(struct input_event *ev, ros::Publisher& ros_publisher)
 {
+  // PowermateEvent ROS message
+  mouse_reader::MouseEvent ros_message;
 
-  std::vector <uint16_t> event;			// output vector
+  // ---- Event information about Griffin PowerMate USB from evtest ----
+  //
+  // Input device name: "Griffin PowerMate"
+  // Supported events:
+  //	Event type 0 (EV_SYN)
+  //	Event type 1 (EV_KEY)
+  //		Event code 256 (BTN_0)
+  //	Event type 2 (EV_REL)
+  //		Event code 7 (REL_DIAL)
+  //	Event type 4 (EV_MSC)
+  //		Event code 1 (MSC_PULSELED)
+  // -------------------------------------------------------------------
   
-  switch(ev->type)				// switch to a case based on the event type
+  // Switch to a case based on the event type
+  switch(ev->type)
   {
-    case EV_SYN:				// this event is always present but no need to do anything
-//       printf("EV_SYN: code=0x%04x, value=0x%08x\n", ev->code, ev->value);
+    case EV_SYN:				// no need to do anything
+//      printf("SYN REPORT\n");
       break; 
-    case EV_MSC:				// this event is always present but no need to do anything
-//       printf("EV_MSC: code=0x%04x, value=0x%08x\n", ev->code, ev->value);
+    case EV_MSC:				// unused for this ROS publisher
+      ROS_INFO("The LED pulse settings were changed; code=0x%04x, value=0x%08x\n", ev->code, ev->value);
       break;
-    case EV_KEY:				// key event means that a key was either pressed or depressed
-      if (ev->value == 1)			// a key was pressed
+    case EV_REL:				// Upon receiving rotation data
+      if(ev->code != REL_DIAL)
+	ROS_WARN("Unexpected rotation event; ev->code = 0x%04x\n", ev->code);
+      else
       {
-	printf("A key was pressed: code=0x%04x, value=0x%08x\n", ev->code, ev->value);
+	// Reads direction value from turn knob
+	signed char dir = (signed char)ev->value;
+	// Sums consecutive dir values to find integral
+	integral_ += (long long)dir;
+	// Composing a ros_message
+	ros_message.direction = dir;
+	ros_message.integral = integral_;
+	ros_message.is_pressed = pressed_;
+	ros_message.push_state_changed = false;
+	// Publish ros_message
+	ros_publisher.publish( ros_message );
+	//printf("Button was rotated %d units; Shift from start is now %d units\n", (int)ev->value, total_shift);
       }
-      else					// a key was depressed
+      break;
+    case EV_KEY:				// Upon receiving data about pressing and depressing the dial button
+      if(ev->code != BTN_0)
+	ROS_WARN("Unexpected key event; ev->code = 0x%04x\n", ev->code);
+      else
       {
-	printf("A key was depressed: code=0x%04x, value=0x%08x\n", ev->code, ev->value);
+	// reads EV_KEY value, converts it to bool
+	pressed_ = (bool)ev->value;
+	// Composing a ros_message
+	ros_message.direction = 0;
+	ros_message.integral = integral_;
+	ros_message.is_pressed = pressed_;
+	ros_message.push_state_changed = true;
+	// Publish ros_message
+	ros_publisher.publish( ros_message );
+	//printf("Button was %s\n", ev->value? "pressed":"released");
       }
-      event.push_back(ev->code);		// push event code to output vector
-      event.push_back(ev->value);		// push event value to output vector
-//       printf("Decimal event_code=%d \n", event[0]);
-      return event;				// return output vector containing event code and value
       break;
     default:					// default case
-      printf("Warning: unexpected event type; ev->type = 0x%04x\n", ev->type);
+      ROS_WARN("Unexpected event type; ev->type = 0x%04x\n", ev->type);
   } // end switch
 
-  return {0, 0};				// return vector with two zeros as elements
+  fflush(stdout);
 } // end processEvent
 
-
-/** Reads event data, and returns relevant info only for EV_KEY events, and dismisses anything that is not a key being pressed or depressed.
- *  @param fd file descriptor for keyboard event file.
- *  @return vector containing two unsigned integers: event code (based on linux/input.h) and event value (1 for pressed, 0 for depressed).
+/** Method for reading the event data and ROS spinning.
+ *  @param ros_publisher ROS publisher used to publish PowermateEvent message.
  */
-std::vector <uint16_t> Mouse::getKeyEvent()
+void Mouse::spinMouse(ros::Publisher& ros_publisher)
 {
-  int const BUFFER_SIZE = 64;
-  struct input_event ibuffer[BUFFER_SIZE];				// see: https://www.kernel.org/doc/Documentation/input/input.txt
+  int const BUFFER_SIZE = 32;
+  
+  // see: https://www.kernel.org/doc/Documentation/input/input.txt
+  struct input_event ibuffer[BUFFER_SIZE];
   int r, events, i;
-  std::vector <uint16_t> event_info;					// processed event
-  
-  // read events to input_event buffer
-  r = read(descriptor_, ibuffer, sizeof(struct input_event) * BUFFER_SIZE);
-  
-  if( r > 0 )
-  {
-      events = r / sizeof(struct input_event);				// getting the number of events
-      for(i=0; i<events; i++)						// going through all the read events
+
+  while( ros::ok() )
+  {  
+    // read() reads a binary file [http://pubs.opengroup.org/onlinepubs/9699919799/functions/read.html] and returns the number of bytes read.
+    // The program waits in read() until there's something to read; thus it always gets a new event but ROS cannot make a clean exit while in read().
+    // TODO: Figure out a way for ROS to exit cleanly.
+    r = read(descriptor_, ibuffer, sizeof(struct input_event) * BUFFER_SIZE);
+    if( r > 0 )
+    {
+      // Calculate the number of events
+      events = r / sizeof(struct input_event);
+      // Go through each read events
+      for(i = 0; i < events; i++)
       {
-	event_info = processEvent(&ibuffer[i]);				// call processEvent() for every read event
-	if (event_info[0] > 0) return event_info;			// return only the code for events different from 0; ie, only when key was pressed or depressed
-      } //end for
-  }
-  else
-  {
-    fprintf(stderr, "read() failed: %s\n", strerror(errno));	// let user know that read() failed
-    return {0, 0};
-  }
+	// Process event and publish data
+	processEvent(&ibuffer[i], ros_publisher);
+	// spin
+	ros::spinOnce();
+      } // end for
+    } // end if
+    else
+    {
+      // Let user know if read() has failed
+      ROS_WARN("read() failed.\n");
+      return;
+    } // end else
 
-} // end getKeyEvent
+  } // end while
+  
+  return;
+} // end spinPowerMate
 
-
-/** Return a string corresponding to a key code.
- *  @param key_code uint corresponding to key on a keyboard
- *  @return string corresponding to a key code
- */
-std::string Mouse::getKeyName(uint16_t key_code)
+/** Main method. */
+int main(int argc, char *argv[])
 {
-    return keymap_[key_code];
-}
+  // ROS init
+  ros::init(argc, argv, "mouse_reader");
+  
+  // Private nodehandle for ROS
+  ros::NodeHandle pnh("~");
+  
+  // Getting user-specified path from ROS parameter server
+  std::string mouse_path;
+  pnh.param<std::string>("path", mouse_path, "");
+  
+  // Let's construct PowerMate object 
+  Mouse mouse(mouse_path);
+  
+  // If failed to open any PowerMate USB device, print info and exit
+  if( !mouse.isReadable() )
+  {
+    ROS_ERROR("Unable to locate any PowerMate device.");
+    ROS_INFO("You may try specifying path as ROS parameter, e.g., rosrun griffin_powermate griffin_powermate _path:=<device_event_path>");
+    return -1;
+  }
+
+  // Creates publisher that advertises griffin_powermate::PowermateEvent messages on topic /griffin_powermate/events
+  ros::Publisher pub_mouse_events = pnh.advertise<mouse_reader::MouseEvent>("events", 100);
+  
+  // After PowerMate is succesfully opened, read its input, publish ROS messages, and spin.
+  mouse.spinMouse(pub_mouse_events);
+
+  // Close PowerMate
+  mouse.closeMouse();
+
+  return 0;
+} //end main

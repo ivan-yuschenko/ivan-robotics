@@ -47,7 +47,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
-  Key.msg
+  MouseEvent.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -194,6 +194,3 @@ include_directories(include)
 add_library(mouse_reader src/mouse_reader.cpp)
 target_link_libraries(mouse_reader ${catkin_LIBRARIES})
 
-add_executable(mouse_event_publisher src/mouse_event_publisher.cpp)
-target_link_libraries(mouse_event_publisher ${catkin_LIBRARIES} mouse_reader)
-add_dependencies(mouse_event_publisher mouse_reader_gencpp)
