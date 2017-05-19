@@ -8,10 +8,11 @@
 #include <moveit_msgs/CollisionObject.h>
 #include <ros/ros.h>
 #include <geometry_msgs/Pose.h>
+#include <ros/console.h>
 
 int main(int argc, char **argv)
 {
-  ros::init(argc, argv, "plan_yaskawa");
+  ros::init(argc, argv, "sia5_plan");
   ros::NodeHandle node_handle;  
   ros::AsyncSpinner spinner(1);
   spinner.start();
@@ -66,12 +67,12 @@ int main(int argc, char **argv)
           std::cout << "x direction" <<std::endl;
 
           target_pose1.position.z -= dis;
-          target_pose1.position.y += 0.2;
+          target_pose1.position.y += 0.1;
           group.setPoseTarget(target_pose1);
           group.move();
           std::cout << "diagonal" <<std::endl;
 
-          target_pose1.position.y -= 0.2;
+          target_pose1.position.y -= 0.1;
           group.setPoseTarget(target_pose1);
           group.move();
           std::cout << "back" <<std::endl;
