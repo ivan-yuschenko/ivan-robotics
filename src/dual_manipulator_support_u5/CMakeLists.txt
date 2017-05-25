@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(dual_manipulator_support)
+project(dual_manipulator_support_u5)
 
 find_package(catkin REQUIRED)
 
